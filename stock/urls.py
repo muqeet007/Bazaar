@@ -1,12 +1,14 @@
-# stock/urls.py
+from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import ProductViewSet, StockMovementViewSet
+from stock.views import StoreViewSet, ProductViewSet, StockMovementViewSet
 
 router = DefaultRouter()
+router.register(r'stores', StoreViewSet)
 router.register(r'products', ProductViewSet)
-router.register(r'movements', StockMovementViewSet)
+router.register(r'stock-movements', StockMovementViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('admin/', admin.site.urls),
+    path('api/', include(router.urls)),
 ]

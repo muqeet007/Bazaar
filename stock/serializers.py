@@ -1,19 +1,20 @@
 from rest_framework import serializers
-from .models import Product, StockMovement
+from .models import Store, Product, StockMovement
+
+class StoreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Store
+        fields = ['id', 'name', 'location', 'created_at']
 
 class StockMovementSerializer(serializers.ModelSerializer):
-    def validate_quantity(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("Quantity must be a positive value.")
-        return value
-  
     class Meta:
         model = StockMovement
-        fields = ['id', 'product', 'movement_type', 'quantity', 'timestamp']
+        fields = ['id', 'product', 'quantity', 'movement_type', 'created_at']
 
 class ProductSerializer(serializers.ModelSerializer):
-    current_quantity = serializers.ReadOnlyField()
-  
+    store = StoreSerializer(read_only=True)
+    movements = StockMovementSerializer(many=True, read_only=True)
+
     class Meta:
         model = Product
-        fields = ['id', 'name', 'current_quantity']
+        fields = ['id', 'store', 'name', 'description', 'price', 'stock_quantity', 'created_at', 'updated_at', 'movements']
