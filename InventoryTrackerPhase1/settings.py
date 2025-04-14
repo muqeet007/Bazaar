@@ -59,11 +59,17 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/day',
+        'stock_updates': '100/minute',  # For stock update operations
+        'audit_logs': '50/minute',      # For audit log operations
+        'store_operations': '200/minute', # For store-related operations
     },
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
 }
 
 MIDDLEWARE = [
@@ -111,8 +117,22 @@ DATABASES = {
         'OPTIONS': {
             'connect_timeout': 10,
         }
+    },
+    'read_replica': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DB_NAME', 'inventory_tracker'),
+        'USER': os.getenv('DB_USER', 'postgres'),
+        'PASSWORD': os.getenv('DB_PASSWORD', 'postgres'),
+        'HOST': os.getenv('DB_REPLICA_HOST', 'localhost'),
+        'PORT': os.getenv('DB_REPLICA_PORT', '5432'),
+        'OPTIONS': {
+            'connect_timeout': 10,
+        }
     }
 }
+
+# Database Router for read/write separation
+DATABASE_ROUTERS = ['stock.routers.PrimaryReplicaRouter']
 
 
 # Password validation
@@ -178,9 +198,21 @@ CACHES = {
         'LOCATION': os.getenv('REDIS_CACHE_URL', 'redis://127.0.0.1:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+            'RETRY_ON_TIMEOUT': True,
+            'MAX_CONNECTIONS': 1000,
+            'CONNECTION_POOL_KWARGS': {'max_connections': 100}
+        },
+        'KEY_PREFIX': 'inventory',
+        'TIMEOUT': 60 * 15,  # 15 minutes
     }
 }
+
+# Cache middleware settings
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 60 * 15  # 15 minutes
+CACHE_MIDDLEWARE_KEY_PREFIX = 'inventory'
 
 # Session Storage with Redis
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'

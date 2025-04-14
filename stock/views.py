@@ -3,12 +3,15 @@ from django.utils.decorators import method_decorator
 from django.db.models import Sum, Count
 from django.db.models.functions import TruncDate
 from rest_framework import viewsets, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, throttle_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import Store, Product, StockMovement
 from .serializers import StoreSerializer, ProductSerializer, StockMovementSerializer
 from .tasks import process_stock_update
+from django.core.cache import cache
+from django.db import transaction
+from rest_framework.throttling import ScopedRateThrottle
 
 class StoreViewSet(viewsets.ModelViewSet):
     queryset = Store.objects.all()
@@ -121,3 +124,38 @@ class LowStockAlertsView(APIView):
 
         serializer = ProductSerializer(queryset, many=True)
         return Response(serializer.data)
+
+@api_view(['GET'])
+@cache_page(60 * 15)  # Cache for 15 minutes
+@throttle_classes([ScopedRateThrottle])
+def store_inventory(request, store_id):
+    """
+    Get inventory for a specific store.
+    Throttled to prevent abuse.
+    """
+    throttle_scope = 'store_operations'
+    # ... existing code ...
+
+@api_view(['POST'])
+@throttle_classes([ScopedRateThrottle])
+def update_stock(request):
+    """
+    Update stock levels.
+    Throttled to prevent abuse.
+    """
+    throttle_scope = 'stock_updates'
+    with transaction.atomic():
+        # ... existing code ...
+        # Invalidate cache after update
+        cache.delete_pattern(f'store_inventory_{store_id}*')
+
+@api_view(['GET'])
+@cache_page(60 * 5)  # Cache for 5 minutes
+@throttle_classes([ScopedRateThrottle])
+def audit_logs(request):
+    """
+    Get audit logs.
+    Throttled to prevent abuse.
+    """
+    throttle_scope = 'audit_logs'
+    # ... existing code ...
