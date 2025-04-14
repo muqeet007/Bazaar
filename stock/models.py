@@ -1,8 +1,10 @@
 from django.db import models
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class Store(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     location = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -10,38 +12,76 @@ class Store(models.Model):
         return self.name
 
 class Product(models.Model):
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=100)
-    description = models.TextField()
+    description = models.TextField(blank=True, null=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='products')
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock_quantity = models.PositiveIntegerField()
+    stock_quantity = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} ({self.store.name})"
+        return self.name
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['store', 'stock_quantity']),
+        ]
 
 class StockMovement(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='movements')
-    quantity = models.IntegerField()  # Positive for stock-in, negative for sales/removals
-    movement_type = models.CharField(max_length=50, choices=[
+    MOVEMENT_TYPES = [
         ('STOCK_IN', 'Stock In'),
         ('SALE', 'Sale'),
         ('MANUAL_REMOVAL', 'Manual Removal'),
-    ])
+    ]
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='stock_movements')
+    quantity = models.IntegerField()
+    movement_type = models.CharField(max_length=20, choices=MOVEMENT_TYPES)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.movement_type} {self.quantity} of {self.product.name}"
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
 
     def clean(self):
-        # Validate quantity based on movement_type
-        if self.movement_type == 'STOCK_IN' and self.quantity <= 0:
-            raise ValidationError("Quantity must be positive for STOCK_IN.")
-        elif self.movement_type in ['SALE', 'MANUAL_REMOVAL'] and self.quantity >= 0:
-            raise ValidationError("Quantity must be negative for SALE or MANUAL_REMOVAL.")
-        # Ensure stock_quantity doesn't go negative
+        if self.quantity <= 0:
+            raise ValidationError('Quantity must be greater than zero')
+        
         if self.movement_type in ['SALE', 'MANUAL_REMOVAL']:
-            new_stock = self.product.stock_quantity + self.quantity  # quantity is negative
-            if new_stock < 0:
-                raise ValidationError(f"Cannot reduce stock below 0. Current stock: {self.product.stock_quantity}, attempted reduction: {-self.quantity}")
+            if self.product.stock_quantity < self.quantity:
+                raise ValidationError('Not enough stock available')
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # Run validation
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.movement_type} of {self.quantity} for {self.product.name}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['product', 'movement_type', 'created_at']),
+        ]
+        ordering = ['-created_at']
+
+class AuditLog(models.Model):
+    stock_movement = models.ForeignKey(StockMovement, on_delete=models.CASCADE, related_name='audit_logs', null=True, blank=True)
+    stock_movement_created_at = models.DateTimeField(null=True, blank=True, default=timezone.now)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        if not self.stock_movement and not self.stock_movement_created_at:
+            raise ValidationError('Either stock_movement or stock_movement_created_at must be provided')
+        if self.stock_movement and self.stock_movement_created_at:
+            self.stock_movement_created_at = self.stock_movement.created_at
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # Run validation
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.action} by {self.user} at {self.timestamp}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['stock_movement', 'timestamp']),
+        ]
+        ordering = ['-timestamp']
