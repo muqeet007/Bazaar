@@ -1,24 +1,176 @@
-# Inventory Tracker - Phase 1
+# Phase 2 Inventory Tracker
 
-A backend system for a single kiryana store to manage inventory, built for the Bazaar Tech Case Study. Uses Django and DRF to provide a REST API for products and stock movements.
+A robust inventory management system built with Django REST Framework, designed for efficient stock tracking and management.
 
-## Features
-- REST API for CRUD on products and stock movements.
-- Real-time stock visibility with `current_quantity()`.
-- Validation: `quantity > 0`, non-blank names.
-- Custom Django admin with live quantities.
-- SQLite for local storage.
+## Overview
 
-## Setup
-1. Clone: `git clone https://github.com/muqeet007/InventoryTrackerPhase1.git`
-2. Virtual env: `python -m venv venv && source venv/Scripts/activate`
-3. Install: `pip install -r requirements.txt`
-4. Migrate: `python manage.py makemigrations && python manage.py migrate`
-5. Run: `python manage.py runserver`
+This project implements a comprehensive inventory tracking system that enables real-time monitoring of product stock levels, movement history, and automated quantity updates. The system is built with scalability in mind while maintaining simplicity in its core functionality.
 
-## API Endpoints
-- `GET /api/products/` - List products.
-- `POST /api/movements/` - Log a movement (e.g., `{"product": 1, "movement_type": "IN", "quantity": 50}`).
+## Requirements
+
+### Core Objectives
+- Develop an inventory tracking system for a single store
+- Track product stock movements (stock in, sales, manual removal)
+- Maintain accurate current quantity for each product
+- Provide simple API interface for inventory management
+- Store data locally using SQLite database
+
+### Key Assumptions
+- Single store inventory management
+- Three types of stock movements:
+  - Stock In (IN): Adding new inventory
+  - Sales (SALE): Product sold to customers
+  - Manual Removal (REMOVE): Damaged/lost items
+- Local data storage is sufficient
+- Basic authentication for API access
+- Real-time quantity tracking required
+
+## Technical Implementation
+
+### Data Models
+
+#### Store
+- Name (unique identifier)
+- Location
+- Creation timestamp
+
+#### Product
+- Name
+- Description
+- Price
+- Current stock quantity
+- Store reference
+- Creation and update timestamps
+
+#### StockMovement
+- Product reference
+- Movement type (STOCK_IN, SALE, MANUAL_REMOVAL)
+- Quantity (positive for stock-in, negative for sales/removals)
+- Creation timestamp
+
+### Features
+
+#### Real-time Stock Management
+- Automatic quantity updates via Django signals
+- Validation to prevent negative stock quantities
+- Real-time stock level tracking
+
+#### API Endpoints
+- Products:
+  - CRUD operations
+  - Stock movement endpoints:
+    - `/products/{id}/stock_in/`
+    - `/products/{id}/sell/`
+    - `/products/{id}/remove/`
+- Stock Movements:
+  - Movement history
+  - Filtering by date range and store
+
+#### Security
+- Basic authentication required for all endpoints
+- Data validation at model and API levels
+- Protected admin interface
+
+### Technology Stack
+- Django REST Framework
+- SQLite Database
+- Django Admin Interface
+- Django Signals for automated updates
+
+## API Documentation
+
+### Authentication
+All endpoints require basic authentication. Include credentials in the request header:
+```
+Authorization: Basic <base64-encoded-credentials>
+```
+
+### Endpoints
+
+#### Products
+- `GET /api/products/` - List all products
+- `POST /api/products/` - Create new product
+- `GET /api/products/{id}/` - Get product details
+- `PUT /api/products/{id}/` - Update product
+- `DELETE /api/products/{id}/` - Delete product
+
+#### Stock Movements
+- `POST /api/products/{id}/stock_in/` - Add stock
+  ```json
+  {
+    "quantity": 10
+  }
+  ```
+- `POST /api/products/{id}/sell/` - Record sale
+  ```json
+  {
+    "quantity": 5
+  }
+  ```
+- `POST /api/products/{id}/remove/` - Manual removal
+  ```json
+  {
+    "quantity": 2
+  }
+  ```
+
+## Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run migrations:
+   ```bash
+   python manage.py migrate
+   ```
+4. Create superuser:
+   ```bash
+   python manage.py createsuperuser
+   ```
+5. Run the development server:
+   ```bash
+   python manage.py runserver
+   ```
+
+## Development
+
+### Project Structure
+```
+inventory/
+├── stock/
+│   ├── models.py      # Data models
+│   ├── views.py       # API endpoints
+│   ├── serializers.py # Data serialization
+│   ├── signals.py     # Automated updates
+│   └── urls.py        # URL routing
+└── inventory/
+    ├── settings.py    # Project settings
+    └── urls.py        # Main URL configuration
+```
+
+### Key Components
+- Models handle data structure and validation
+- Signals automate stock quantity updates
+- Viewsets provide RESTful API endpoints
+- Serializers handle data transformation
+
+## Testing
+Run tests using:
+```bash
+python manage.py test
+```
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+This project is licensed under the MIT License.
 
 ## Author
-- Muqeet (muqeet007 on GitHub)
+Syed Muqeet Ur Rehman (muqeet007)
